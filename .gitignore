@@ -1,2 +1,9 @@
 .DS_Store
 .vscode
+Sources/Infomap-0.15.7/build/*.o
+Sources/Infomap-0.15.7/build/infomap/*.o
+Sources/Infomap-0.15.7/build/io/*.o
+Sources/Infomap-0.15.7/build/utils/*.o
+Sources/TopicMapping/docmap_tmp.cpp
+bin/
+time_seed.dat

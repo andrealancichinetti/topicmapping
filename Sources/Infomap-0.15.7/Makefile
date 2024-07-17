@@ -1,8 +1,8 @@
 #Generated Makefile
 CXX  = g++
-CXXFLAGS = -Wall -O4 -pipe -fopenmp
+CXXFLAGS = -Wall -O4 -pipe
 LINKER = $(CXX)
-LFLAGS = -fopenmp
+LFLAGS =
 
 HEADERS = \
 src/infomap/Edge.h \
