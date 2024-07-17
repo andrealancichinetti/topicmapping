@@ -1,0 +1,264 @@
+\documentclass[11pt]{article}
+\usepackage{geometry}                % See geometry.pdf to learn the layout options. There are lots.
+\geometry{letterpaper}                   % ... or a4paper or a5paper or ... 
+%\geometry{landscape}                % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    % Activate to begin paragraphs with an empty line rather than an indent
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{epstopdf}
+\usepackage{hyperref}
+\usepackage[usenames,dvipsnames]{color}
+
+\DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
+
+\title{User's guide for TopicMapping (version 1.0)}
+%\date{}                                           % Activate to display a given date or no date
+
+
+
+\begin{document}
+
+
+\maketitle
+
+
+%\section{}
+%\subsection{}
+
+Thanks for downloading the code which implements TopicMapping.
+The algorithm finds topics in a set of documents using network clustering (Infomap) [1] 
+and  LDA likelihood optimization [2]. 
+
+
+This guide will tell you how to compile, what are the input and output format,
+how to tune the algorithm's parameters, and some more.
+
+
+
+\tableofcontents
+
+\newpage
+
+\section{Compiling}
+
+
+Open  a a Unix (MAC) terminal and type  
+
+\textbf{python compile.py}
+
+If you are using Windows, you could still run
+the program by installing MinGW
+(Minimalist GNU for Windows, \url{http://www.mingw.org/}).
+
+
+\section{Input and Output}
+
+\subsection{Input}
+Let us start with an example:
+
+\textbf{./bin/topicmap -f quantum-and-granular-large-stemmed -t 10 -o test\_results}
+
+The option \textbf{-f} is followed by the name of the file where the corpus is recorded. This file is supposed 
+to contain a number of strings separated by newlines. Every string will be considered a different document.
+
+In the example, 
+\textit{``quantum comput predict util  \dots"}
+is the first document, 
+\textit{``develop theori interlay tunnel \dots"}
+is the second document and so on.
+
+The reason why the documents look a little strange is that we used a stemming algorithm and we removed stop-words. If you want to do the same thing (we recommend it),  you can use the following:
+
+\textbf{python Sources/NatLangProc/stem.py [original\_file] [output\_file]}
+
+which requires the python library called \textit{stemming}.
+
+The list of stop words is in ``\textit{Sources/NatLangProc/blacklist129.txt}".
+
+\textbf{IMPORTANT:} Please make sure that your corpus file does not contain empty lines (or lines with just white spaces). 
+
+The other options in the example are explained in the next two sections.
+%On a side note, 
+%\textbf{-p 0.5} is tuning the $p-$value for assessing if words deserve to be connected.
+%The reason for such a high  $p-$value is that the corpus is so small that its word similarities are not considered significant otherwise (see below).
+
+\subsection{Output}
+
+Option \textbf{-o} specifies the directory where all the output is redirected to, \textit{test\_results} in the example above.
+
+
+Each document is associated with a probability distribution of topics and 
+each topic is characterized by a  distribution of words. These two distributions are written in two separate files:
+
+\begin{enumerate}
+  \item \textbf{lda\_gammas\_final.txt} provides the probability of topics, for each document: $p(\textrm{topic}|\textrm{doc})$. Every line refers to a document, in the same order as they appear in the corpus file. Each number is the average usage of the corresponding topics.
+ 
+ For instance, ``0.025 0.01 58.8" means that topic 0 is used $0.025$ times, topic 1 is used $0.01$ times, and topic 2 is used $58.8$ times, on average.
+ To get the probabilities, just normalize this vector.
+
+  \item  \textbf{lda\_betas\_sparse\_final.txt} provides $p(\textrm{word}|\textrm{topic})$. Every line is a topic. The first number is the topic number. After that,  pairs \textbf{(word-id, probability)} are sorted starting from the most probable. The word-ids can be mapped to the actual words from the file \textbf{word\_wn\_count.txt} (see below).
+\end{enumerate}
+
+Similar files such as  \textbf{lda\_gammas\_1.txt},  \textbf{lda\_gammas\_6.txt} etc., are printed every few iterations. Files  \textbf{plsa\_thetas.txt} and  \textbf{plsa\_betas\_sparse.txt} also have the same content, obtained before running LDA optimization.
+
+
+
+Other supporting files are:
+\begin{enumerate}
+\item \textbf{lda\_summary\_final.txt} gives overall information about the topics, such as their probability $p(t)$, the total number of words which have positive probability given this topic, and their top $100$ words.
+\item \textbf{word\_wn\_count.txt} contains strings in the format ``word~word-id~occurrences".
+\item \textbf{infomap.part} contains the (hard) partition of words found by Infomap, where words are represented with the word-id which can be found in  \textbf{word\_wn\_count.txt}
+\item \textbf{infomap-words.part} is the same file as before, written in words.
+\end{enumerate}
+
+
+\section{Algorithm options}
+
+The basic way to run TopicMapping is to specify just the corpus file and the out-directory.
+
+However, TopicMapping has also a number of options to tune the size of the topics, the execution time and more.
+The following is an overview of most available options. Other options are available calling the program without arguments.
+
+
+\subsection{Topic size}
+
+The algorithm runs without supervision, in particular it does not require that you input a prefixed number of topics. However,  two options are available to tune the granularity of the topics to some extent:
+
+\begin{enumerate}
+\item \textbf{-t}~[threshold (integer)]. Minimum number of documents per topic. A few topics will likely be very small because of some isolated words. This option allows to get rid of very small topics, such as those used less than the threshold. The threshold is measured in number of documents: for instance \textbf{-t 10} means that each topic must be covered by  at least 10 documents. \textbf{10 (default) or 100 is recommended for fairly large corpuses.} \small{Documents which are entirely isolated from the others, cannot be assigned to any other topic and will still belong to their own topic.}\normalsize{}
+
+\item \textbf{-p}~[$p$-value (float)].
+Higher values of the $p$-value will deliver fewer and  more coarse-grained topics because the network of words is more connected. Default is $5\%$.
+\end{enumerate}
+
+Examples:
+
+\textbf{./bin/topicmap -f quantum-and-granular-large-stemmed -p 0.1 -o test\_results -t 10}
+
+This does not change the topics very much. But the next example will filter out small topics, so that only two will be left.
+
+
+\textbf{./bin/topicmap -f quantum-and-granular-large-stemmed -o test\_results -t 100}
+
+
+
+
+\subsection{Speed vs accuracy}
+
+There are two options to set the accuracy of the algorithm. Tuning them, you can get faster or more accurate results:
+
+
+\begin{enumerate}
+
+\item \textbf{-r}~[number of runs (integer)].
+How many times you want the network clustering algorithm to run. Default is 10.
+
+\item \textbf{-step}~[interval in PLSA local optimization (float)].
+Default is 0.01. For example, 0.05 can be used to get faster results.
+Similarly, selecting \textbf{-minf} or \textbf{-maxf}, you can narrow the filter range and make the algorithm faster.
+\end{enumerate}
+
+
+
+Example:
+
+\textbf{./bin/topicmap -f quantum-and-granular-large-stemmed -r 1 -step 0.05 -o test\_results}
+
+
+
+
+\subsection{Recycling previous runs}
+
+If you like to run the algorithm again with a different threshold, you can read the word partition saved in a previous run in the file called ``\textit{infomap.part}". This will skip the first part of the algorithm: building the network and running Infomap for the topics. The option is: \textbf{-part} [infomap.part (string)].
+
+After running the algorithm without the option, try:
+
+\textbf{./bin/topicmap -f quantum-and-granular-large-stemmed -o test\_results2 -t 100 -part test\_results/infomap.part }
+
+\small This allows you to explore how the topics change filtering out more topics (\textbf{-t 100}), without running everything from scratch.
+
+\normalsize
+
+
+\subsection{Random number generator}
+
+If you do not specify any seed, it will be read from the file \textbf{time\_seed.dat}, which is updated at each run.
+If you like to input the seed, the option is \textbf{-seed} [integer].
+
+Example:
+
+\textbf{./bin/topicmap -f quantum-and-granular-large-stemmed -o test\_results -seed 101010 }
+
+
+
+
+
+\section{Subtopics}
+
+
+Sometimes, it is interesting to zoom-in in a topic to find its sub-topics. In order to do that, first we need to decide which topic we want to break further
+(for that, it is helpful to look at file \textbf{lda\_summary\_final.txt}). Let us say that we would like to zoom-in in topic 0.
+Running:
+
+\textbf{python Sources/py\_utils/write\_sub\_corpus.py test\_results/lda\_word\_assignments\_final.txt 0},
+
+we get a file called \textbf{sub\_corpus.txt}, which only contains words which were more likely drawn from topic 0.  We can now simply run TopicMapping on the sub-corpus (\textbf{./bin/topicmap -f sub\_corpus.txt -o sub\_results}). The file \textbf{doc\_list.txt} reports the original ids of the documents which appear in the sub-corpus.
+
+
+\section{Parallelizing (beta)}
+
+We also provide a simple python script to parallelize the part of the program which builds the network. Try:
+
+\textbf{python Sources/py\_utils/run\_parallel\_signet.py quantum-and-granular-large-stemmed}
+
+and follows the instructions to run TopicMapping after this.
+
+There is also a script to parallelize the LDA optimization. To use it, you first need to run TopicMapping with option \textbf{-skip\_lda}, which just provides the file \textbf{plsa\_betas\_sparse.txt}.  After that, try:
+
+\textbf{python Sources/py\_utils/run\_parallel\_lda.py},
+
+where \textbf{[intial\_model]} should be the path to the file \textbf{plsa\_betas\_sparse.txt}.
+
+
+
+
+
+
+\section{Acknowledgments}
+
+TopicMapping re-uses some of the code which implements the original Infomap [1]. The LDA likelihood optimization code closely follows the 
+original code by David Blei [2].
+Xiaohan Zeng curated the stemming algorithm. David Mertens compiled the corpus ``\textit{quantum-and-granular-large-stemmed}" pulling abstracts about ``quantum computing" and ``transitions in granular systems". 
+All the rest was developed by Andrea Lancichinetti.
+
+%
+%
+%
+%
+%
+%
+
+\section{References}
+
+
+\vskip0.3cm
+
+\noindent [1] M. Rosvall and  C. T. Bergstrom, Proc. Natl. Acad. Sci. U.S.A {\bf 105}, 1118 (2008).
+
+\vskip0.3cm
+\noindent [2] D. Blei, A. Y. Ng, and M. I. Jordan,  The Journal of Machine Learning Research 3 (2003): 993-1022.
+
+
+
+\vskip0.3cm
+\vskip0.3cm
+If you found this program useful for your research, please cite:
+
+\noindent [3] A high-reproducibility and high-accuracy method for automated topic classification. (to be published)
+
+\vskip0.3cm
+
+
+
+\end{document}  
+         
